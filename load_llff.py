@@ -317,3 +317,6 @@ def load_llff_data(basedir, factor=8, recenter=True, bd_factor=.75, spherify=Fal
 
 
 
+if __name__=='__main__':
+
+    load_llff_data('./data/nerf_llff_data/raw')

@@ -18,6 +18,8 @@ from load_deepvoxels import load_dv_data
 from load_blender import load_blender_data
 from load_LINEMOD import load_LINEMOD_data
 
+import wandb
+torch.set_default_tensor_type('torch.cuda.FloatTensor')
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 np.random.seed(0)
@@ -246,6 +248,10 @@ def create_nerf(args):
         'raw_noise_std' : args.raw_noise_std,
     }
 
+    wandb.init(project="nerf_edu-SekiroRong", entity="sekirorong", config = render_kwargs_train,
+        name=f"perturb-{args.perturb}|N_importance-{args.N_importance}|N_samples-{args.N_samples}|use_viewdirs-{args.use_viewdirs}|white_bkgd-{args.white_bkgd}|raw_noise_std-{args.raw_noise_std}",
+                        group='crispy_thigh')
+
     # NDC only good for LLFF-style forward facing data
     if args.dataset_type != 'llff' or args.no_ndc:
         print('Not ndc!')
@@ -291,7 +297,6 @@ def raw2outputs(raw, z_vals, rays_d, raw_noise_std=0, white_bkgd=False, pytest=F
             noise = torch.Tensor(noise)
 
     alpha = raw2alpha(raw[...,3] + noise, dists)  # [N_rays, N_samples]
-    # weights = alpha * tf.math.cumprod(1.-alpha + 1e-10, -1, exclusive=True)
     weights = alpha * torch.cumprod(torch.cat([torch.ones((alpha.shape[0], 1)), 1.-alpha + 1e-10], -1), -1)[:, :-1]
     rgb_map = torch.sum(weights[...,None] * rgb, -2)  # [N_rays, 3]
 
@@ -446,9 +451,9 @@ def config_parser():
                         help='learning rate')
     parser.add_argument("--lrate_decay", type=int, default=250, 
                         help='exponential learning rate decay (in 1000 steps)')
-    parser.add_argument("--chunk", type=int, default=1024*32, 
+    parser.add_argument("--chunk", type=int, default=256*8, 
                         help='number of rays processed in parallel, decrease if running out of memory')
-    parser.add_argument("--netchunk", type=int, default=1024*64, 
+    parser.add_argument("--netchunk", type=int, default=128*8, 
                         help='number of pts sent through network in parallel, decrease if running out of memory')
     parser.add_argument("--no_batching", action='store_true', 
                         help='only take random rays from 1 image at a time')
@@ -827,6 +832,7 @@ def train():
     
         if i%args.i_print==0:
             tqdm.write(f"[TRAIN] Iter: {i} Loss: {loss.item()}  PSNR: {psnr.item()}")
+            wandb.log({"train loss": loss.item(), "PSNR": psnr.item()})
         """
             print(expname, i, psnr.numpy(), loss.numpy(), global_step.numpy())
             print('iter time {:.05f}'.format(dt))
