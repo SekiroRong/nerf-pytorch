@@ -58,8 +58,8 @@ K = np.array([
 
 test = run_nerf.render(H, W, K, c2w=torch.tensor(c2w, dtype=torch.float32), **render_kwargs_test)
 img = np.clip(test[0].cpu(),0,1)
-# plt.imshow(img)
-# plt.show()
+plt.imshow(img)
+plt.show()
 
 N = 256
 t = np.linspace(-1.2, 1.2, N+1)
@@ -80,7 +80,7 @@ def batchify(fn, chunk):
     
 fn = lambda i0, i1 : net_fn(flat[i0:i1,None,:], viewdirs=torch.zeros_like(flat[i0:i1]), network_fn=render_kwargs_test['network_fine'])
 chunk = 1024*64
-raw = np.concatenate([fn(i, i+chunk) for i in range(0, flat.shape[0], chunk)], 0)
+raw = np.concatenate([np.array(fn(i, i+chunk).cpu()) for i in range(0, flat.shape[0], chunk)], 0)
 raw = np.reshape(raw, list(sh[:-1]) + [-1])
 sigma = np.maximum(raw[...,-1], 0.)
 
@@ -99,6 +99,11 @@ print('done', vertices.shape, triangles.shape)
 
 ### Uncomment to save out the mesh
 mcubes.export_mesh(vertices, triangles, "logs/blender_paper_lego/lego_{}.dae".format(N), "lego")
+
+import trimesh
+
+mesh = trimesh.Trimesh(vertices / N - .5, triangles)
+mesh.show()
 
 os.environ["PYOPENGL_PLATFORM"] = "egl"
 import pyrender

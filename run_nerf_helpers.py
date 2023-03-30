@@ -94,28 +94,27 @@ class NeRF(nn.Module):
             self.output_linear = nn.Linear(W, output_ch)
 
     def forward(self, x):
-        with torch.no_grad():
-            input_pts, input_views = torch.split(x, [self.input_ch, self.input_ch_views], dim=-1)
-            h = input_pts
-            for i, l in enumerate(self.pts_linears):
-                h = self.pts_linears[i](h)
+        input_pts, input_views = torch.split(x, [self.input_ch, self.input_ch_views], dim=-1)
+        h = input_pts
+        for i, l in enumerate(self.pts_linears):
+            h = self.pts_linears[i](h)
+            h = F.relu(h)
+            if i in self.skips:
+                h = torch.cat([input_pts, h], -1)
+
+        if self.use_viewdirs:
+            alpha = self.alpha_linear(h)
+            feature = self.feature_linear(h)
+            h = torch.cat([feature, input_views], -1)
+        
+            for i, l in enumerate(self.views_linears):
+                h = self.views_linears[i](h)
                 h = F.relu(h)
-                if i in self.skips:
-                    h = torch.cat([input_pts, h], -1)
 
-            if self.use_viewdirs:
-                alpha = self.alpha_linear(h)
-                feature = self.feature_linear(h)
-                h = torch.cat([feature, input_views], -1)
-            
-                for i, l in enumerate(self.views_linears):
-                    h = self.views_linears[i](h)
-                    h = F.relu(h)
-
-                rgb = self.rgb_linear(h)
-                outputs = torch.cat([rgb, alpha], -1)
-            else:
-                outputs = self.output_linear(h)
+            rgb = self.rgb_linear(h)
+            outputs = torch.cat([rgb, alpha], -1)
+        else:
+            outputs = self.output_linear(h)
 
         return outputs    
 
